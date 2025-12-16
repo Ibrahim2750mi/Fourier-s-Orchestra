@@ -16,7 +16,7 @@ Final df structure:
 Loading the .mp3 files directly leads to crash due to consumption of all the ram.
 
 Current loading process:
-```
+```python
 import librosa
 
 AUDIO_PATH = Path("/content/DEAM_audio/MEMD_audio")
