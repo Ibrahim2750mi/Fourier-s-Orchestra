@@ -6,6 +6,7 @@ Initital df structure.
 <img width="767" height="233" alt="Screenshot from 2025-12-12 02-54-47" src="https://github.com/user-attachments/assets/6c3c807b-0065-42ba-98f3-979a1ccee0ed" />
 
 Final df structure:
+
 <img width="426" height="210" alt="Screenshot from 2025-12-15 19-54-17" src="https://github.com/user-attachments/assets/dcf29df1-9d0c-44f2-8697-497ea0b9bec3" />
 
 
@@ -13,7 +14,7 @@ Final df structure:
 Loading the .mp3 files directly leads to crash due to consumption of all the ram.
 
 Current loading process:
-```
+```python
 import librosa
 
 AUDIO_PATH = Path("/content/DEAM_audio/MEMD_audio")
@@ -89,28 +90,28 @@ Loading data on demand and automated batch processing.
 
 ## CNN
 
-```
+```py
 Architecture	Features	Kernel
 Conv2d		
 |
-ReLU		(1->16)		(3x3)
+ReLU		  (1->16)		(3x3)
 |
 MaxPool
 
 Conv2d
 |
-ReLU		(16->32)	(3x3)
+ReLU		  (16->32)	(3x3)
 |
 MaxPool
 
 Flatten
 |
-Linear		(32->2)
+Linear		  (32->2)
 
 ```
 <img width="1021" height="470" alt="image" src="https://github.com/user-attachments/assets/dc6f4b81-6437-4681-a0fb-2fd1d406947e" />
 
-```
+```py
 Mean baseline prediction: [0.12383987 0.07644205]
 Baseline MSE: 0.06585912
 Model MSE: 0.036714073
@@ -118,7 +119,7 @@ Model MSE: 0.036714073
 
 ### Loss: MSE
 Due to continous real values of arousal and valence
-```
+```py
 valence ≈ -0.55 to +0.74
 arousal ≈ -0.67 to +0.71
 ```
