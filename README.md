@@ -111,6 +111,9 @@ Linear		  (32->2)
 ```
 <img width="1021" height="470" alt="image" src="https://github.com/user-attachments/assets/dc6f4b81-6437-4681-a0fb-2fd1d406947e" />
 
+
+The DEAM manual said arousal values are more noisy than valence, hence two different results.
+
 ```py
 Mean baseline prediction: [0.12383987 0.07644205]
 Baseline MSE: 0.06585912
