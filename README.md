@@ -3,10 +3,11 @@
 Dreferring dynamic so we have more training data, starting from 15s, with 5second clip size.
 
 Initital df structure.
-![d6fb5fe64e614e3d230cccc190384f44.png](:/1905335258c0444cbb9f4502689e89e9)
+<img width="767" height="233" alt="Screenshot from 2025-12-12 02-54-47" src="https://github.com/user-attachments/assets/6c3c807b-0065-42ba-98f3-979a1ccee0ed" />
 
 Final df structure:
-![5c14b900993006a5a0ba23bfe30508a9.png](:/a2cfb43a346f4e929382f135051475a5)
+<img width="426" height="210" alt="Screenshot from 2025-12-15 19-54-17" src="https://github.com/user-attachments/assets/dcf29df1-9d0c-44f2-8697-497ea0b9bec3" />
+
 
 ### 2. Loading the .mp3 files
 Loading the .mp3 files directly leads to crash due to consumption of all the ram.
@@ -107,8 +108,7 @@ Flatten
 Linear		(32->2)
 
 ```
-
-![2d59b8bfaaf79f90440c21fb8bfa6f5a.png](:/bce0b24dbc7b4ebbbbd3a76b2ca2915c)
+<img width="1021" height="470" alt="image" src="https://github.com/user-attachments/assets/dc6f4b81-6437-4681-a0fb-2fd1d406947e" />
 
 ```
 Mean baseline prediction: [0.12383987 0.07644205]
