@@ -1,7 +1,3 @@
-# Fourier-s-Orchestra
-Submission for BYOP 2025
-
-
 ## Figuring out how to use data
 ###  1. Dynamic annotations v/s static annotations:
 Dreferring dynamic so we have more training data, starting from 15s, with 5second clip size.
@@ -16,7 +12,7 @@ Final df structure:
 Loading the .mp3 files directly leads to crash due to consumption of all the ram.
 
 Current loading process:
-```python
+```
 import librosa
 
 AUDIO_PATH = Path("/content/DEAM_audio/MEMD_audio")
@@ -89,4 +85,42 @@ Loading data on demand and automated batch processing.
 ```
 
 
-Initialy the spec range was from [-80, 0], converted it to [0,1] for activation function.
+
+## CNN
+
+```
+Architecture	Features	Kernel
+Conv2d		
+|
+ReLU		(1->16)		(3x3)
+|
+MaxPool
+
+Conv2d
+|
+ReLU		(16->32)	(3x3)
+|
+MaxPool
+
+Flatten
+|
+Linear		(32->2)
+
+```
+
+![2d59b8bfaaf79f90440c21fb8bfa6f5a.png](:/bce0b24dbc7b4ebbbbd3a76b2ca2915c)
+
+```
+Mean baseline prediction: [0.12383987 0.07644205]
+Baseline MSE: 0.06585912
+Model MSE: 0.036714073
+```
+
+### Loss: MSE
+Due to continous real values of arousal and valence
+```
+valence ≈ -0.55 to +0.74
+arousal ≈ -0.67 to +0.71
+```
+### Optimizer: Adam
+For handling noisy gradients and moderate dataset.
