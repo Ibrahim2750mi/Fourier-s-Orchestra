@@ -128,3 +128,66 @@ arousal ≈ -0.67 to +0.71
 ```
 ### Optimizer: Adam
 For handling noisy gradients and moderate dataset.
+
+# Generator
+## Note Creation
+Apparently to apply gradient descent all of the functions in the chain needs to be differentiable, i.e using a library to generate notes is not applicable, hence I am going to write the note generation code again in pytorch this time instead of numpy(PyMusic-Instrument).
+
+## Methodology
+Create an array of notes of a specific scale such as 5.
+`fifth = [63, 61, 59, 57, 56, 54, 52]*7`
+We can control the parameters such as duration, loudness and each note's onset following the DDSP algorithm.
+`waveform = A(t) * sin(2pift)`
+`A(t)` is the envelope function.
+### Instrument: Piano
+Craft relevant ADSR for piano.
+Attack Decay Sustain Release.
+
+---
+## Method 1:
+```python
+# Trainable parameters 
+durations_ = torch.ones(len(fifth), requires_grad=True, device=device)
+amplitudes_ = torch.ones(len(fifth), requires_grad=True, device=device)
+```
+### Problem:
+We get this error when directly parameterizing duration. This likely happend due to one of the ADSR parameters reaching inf, due to the denominator tending to zero i.e `duration = A + D +R`.
+When one inf, backprop produced NaN parameters.
+
+```python
+Traceback (most recent call last):
+  File "/home/hp/PycharmProjects/Fourier-s-Orchestra/main.py", line 143, in <module>
+    audio = generate_note(fifth, durations_, amplitudes_)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hp/PycharmProjects/Fourier-s-Orchestra/main.py", line 89, in generate_note
+    num_samples = int(44100 * duration.item())
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: cannot convert float NaN to integer
+```
+
+---
+## Method 2: DDSP:
+### Why switch to temporal masking (DDSP)?
+
+Using method 1 to directly paramterize duration led variable tensor dimensions, which violated the fixed assumptions of backpropagation. Instead now we have desgined a 5 second canvas, with each note having an onset.
+Note onsets are initialised using `linspace` such that the time domain is evenly filled by the notes.
+
+```python
+# Trainable parameters
+note_onsets = torch.linspace(0, 4, len(fifth), device=device, requires_grad=True)
+note_durations = torch.full((len(fifth),), 0.5, device=device, requires_grad=True)
+amplitudes = torch.full((len(fifth),), 0.7, device=device, requires_grad=True)
+```
+
+Clear distinction: `durations_` controlled how long the note existed v/s `note_durations` controls how long the note is audible.
+
+### Problem:
+Arousal and valence value are not independently controllable.
+
+```python
+# Loss
+loss = torch.dist(pred_emotion, target)
+```
+Clearly using euclidean loss, makes the system closer to diagonally even if the valence(or arousal) drifts off too far from the target values.
+
+Amplitude, Note density and short durations all affect arousal more, hence in few of our test runs we observed our generator only chasing arousal target value and the valence being handled according to arousal.
