@@ -87,30 +87,38 @@ def generate_note_ddsp(keys, note_onsets, note_durations, amplitudes, env_elems,
 
 def piano_envelope_ddsp(t_relative, duration, amplitude, A=0.01, D=0.15, S=0.7, R=0.3):
     """
-    ADSR envelope for DDSP approach.
-    Works with relative time (from note onset).
+    ADSR envelope with NaN-safe operations
     """
+    # Clamp inputs to safe ranges
+    A = torch.clamp(A, min=0.001, max=0.2)
+    D = torch.clamp(D, min=0.01, max=1.0)
+    S = torch.clamp(S, min=0.1, max=1.0)
+    R = torch.clamp(R, min=0.05, max=1.5)
+    duration = torch.clamp(duration, min=0.1, max=3.0)
+    amplitude = torch.clamp(amplitude, min=0.0, max=1.0)
 
-    # Clamp negative times to 0 (before note starts)
+    # Clamp negative times to 0
     t_relative = torch.clamp(t_relative, min=0)
 
-    # Attack
-    attack = torch.clamp(t_relative / A, max=1.0)
+    # Attack - add epsilon to denominator
+    attack = torch.clamp(t_relative / (A + 1e-6), max=1.0)
 
-    # Decay
-    decay_t = torch.clamp((t_relative - A) / D, min=0, max=1.0)
+    # Decay - add epsilon
+    decay_t = torch.clamp((t_relative - A) / (D + 1e-6), min=0, max=1.0)
     decay = 1 - (1 - S) * decay_t
 
-    # Sustain (exponential fade)
-    sustain_t = torch.clamp((t_relative - A - D) / (duration - A - D - R + 1e-6), min=0, max=1.0)
+    # Sustain - add epsilon to avoid division by zero
+    sustain_denom = duration - A - D - R + 1e-6
+    sustain_denom = torch.clamp(sustain_denom, min=1e-6)  # Ensure positive
+    sustain_t = torch.clamp((t_relative - A - D) / sustain_denom, min=0, max=1.0)
     sustain = S * torch.exp(-1.5 * sustain_t)
 
-    # Release
+    # Release - add epsilon
     release_start = duration - R
-    release_t = torch.clamp((t_relative - release_start) / R, min=0, max=1.0)
+    release_t = torch.clamp((t_relative - release_start) / (R + 1e-6), min=0, max=1.0)
     release = S * torch.exp(torch.tensor(-1.5, device=t_relative.device)) * (1 - release_t)
 
-    # Combine phases using soft blending
+    # Soft blending weights
     w_attack = torch.sigmoid(100 * (A - t_relative))
     w_decay = torch.sigmoid(100 * (A + D - t_relative)) * (1 - w_attack)
     w_sustain = torch.sigmoid(100 * (release_start - t_relative)) * (1 - w_decay)
@@ -122,6 +130,9 @@ def piano_envelope_ddsp(t_relative, duration, amplitude, A=0.01, D=0.15, S=0.7, 
             w_sustain * sustain +
             w_release * release
     )
+
+    # Final clamp to ensure valid range
+    envelope = torch.clamp(envelope, min=0.0, max=1.0)
 
     return amplitude * envelope
 
@@ -153,7 +164,7 @@ mel_transform = torchaudio.transforms.MelSpectrogram(
 ).to(device)
 amp_to_db = torchaudio.transforms.AmplitudeToDB().to(device)
 
-final_target_arousal = 0.7
+final_target_arousal = -0.7
 final_target_valence = -0.5
 
 
@@ -228,7 +239,7 @@ for step in range(250):
     durations_positive = torch.nn.functional.softplus(note_durations_) + 0.1
     amplitudes_positive = torch.sigmoid(amplitudes_)
 
-    # Attack: 0.001 to 0.1 seconds (very fast to fast)
+    # Attack: 0.001 to 0.1 seconds
     A_val = torch.sigmoid(A_shared) * 0.099 + 0.001
 
     # Decay: 0.01 to 0.5 seconds
@@ -257,7 +268,7 @@ for step in range(250):
     # Weight valence more heavily now
     arousal_loss = (10*(pred_emotion[0, 0] - target[0, 0])) ** 2
     valence_loss = (10*(pred_emotion[0, 1] - target[0, 1])) ** 2
-    loss = valence_loss  # Emphasize valence
+    loss = valence_loss*2.5 + arousal_loss
 
     loss.backward()
     torch.nn.utils.clip_grad_norm_([note_onsets_, note_durations_, amplitudes_,
@@ -293,7 +304,7 @@ for step in range(200):
     durations_positive = torch.nn.functional.softplus(note_durations_) + 0.1
     amplitudes_positive = torch.sigmoid(amplitudes_)
 
-    # Attack: 0.001 to 0.1 seconds (very fast to fast)
+    # Attack: 0.001 to 0.1 seconds
     A_val = torch.sigmoid(A_shared) * 0.099 + 0.001
 
     # Decay: 0.01 to 0.5 seconds
@@ -328,7 +339,7 @@ for step in range(200):
     torch.nn.utils.clip_grad_norm_([note_onsets_, note_durations_, amplitudes_,
                                     A_shared, D_shared, S_shared, R_shared], max_norm=1.0)
     optimizer.step()
-    scheduler.step(loss)
+    scheduler.step(loss.item())
 
     if loss.item() < best_loss:
         best_loss = loss.item()
