@@ -167,7 +167,7 @@ mel_transform = torchaudio.transforms.MelSpectrogram(
 amp_to_db = torchaudio.transforms.AmplitudeToDB().to(device)
 
 final_target_arousal = -0.7
-final_target_valence = -0.5
+final_target_valence = 0.5
 
 
 print(f"\n1. Optimizing Arousal → {final_target_arousal}")
@@ -176,7 +176,7 @@ target = torch.tensor([[final_target_arousal, 0.0]], device=device)
 
 optimizer = torch.optim.Adam([note_onsets_, note_durations_, amplitudes_], lr=0.05)
 
-for step in range(300):
+for step in range(120):
     optimizer.zero_grad()
 
     onsets_positive = torch.sigmoid(note_onsets_) * 4.0
@@ -232,7 +232,7 @@ print(f"\n2. Valence → {final_target_valence}")
 target = torch.tensor([[final_target_arousal, final_target_valence]], device=device)
 
 # Now optimize ADSR too
-optimizer = torch.optim.Adam([note_onsets_, A_shared, D_shared, S_shared, R_shared], lr=0.03)
+optimizer = torch.optim.Adam([note_durations_, A_shared, D_shared, S_shared, R_shared], lr=0.03)
 
 for step in range(250):
     optimizer.zero_grad()
@@ -270,7 +270,7 @@ for step in range(250):
     # Weight valence more heavily now
     arousal_loss = (10*(pred_emotion[0, 0] - target[0, 0])) ** 2
     valence_loss = (10*(pred_emotion[0, 1] - target[0, 1])) ** 2
-    loss = valence_loss*2.5 + arousal_loss
+    loss = valence_loss*2.5
 
     loss.backward()
     torch.nn.utils.clip_grad_norm_([note_onsets_, note_durations_, amplitudes_,
@@ -299,7 +299,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 
 best_loss = float('inf')
 
-for step in range(200):
+for step in range(320):
     optimizer.zero_grad()
 
     onsets_positive = torch.sigmoid(note_onsets_) * 4.0
@@ -332,11 +332,27 @@ for step in range(200):
 
     pred_emotion = model(spec_db)
 
-    # Equal weights
-    arousal_loss = (10*(pred_emotion[0, 0] - target[0, 0])) ** 2
-    valence_loss = (10*(pred_emotion[0, 1] - target[0, 1])) ** 2
-    loss = arousal_loss + valence_loss
+    pred_a = pred_emotion[0, 0]
+    pred_v = pred_emotion[0, 1]
+    target_a = target[0, 0]
+    target_v = target[0, 1]
 
+    # Check quadrant correctness
+    in_correct_quadrant = ((pred_a * target_a) > 0) and ((pred_v * target_v) > 0)
+
+    arousal_error = 10*(pred_a - target_a)
+    if arousal_error*target_a > 0:
+        arousal_error /= 10
+    valence_error = 10*(pred_v - target_v)
+    if valence_error*target_v > 0:
+        valence_error /= 10
+    # 10x penalty if wrong quadrant
+    if (pred_a * target_a) < 0:
+        arousal_error = arousal_error * 10.0
+    if (pred_v * target_v) < 0:
+        valence_error = valence_error * 10.0
+
+    loss = arousal_error**2 + valence_error**2
     loss.backward()
     torch.nn.utils.clip_grad_norm_([note_onsets_, note_durations_, amplitudes_,
                                     A_shared, D_shared, S_shared, R_shared], max_norm=1.0)
@@ -346,8 +362,8 @@ for step in range(200):
     if loss.item() < best_loss:
         best_loss = loss.item()
 
-    if loss.item() < 10:
-        print(f"\nConverged! Loss {loss.item()} < 10 at step {step}")
+    if loss.item() < 5 and in_correct_quadrant:
+        print(f"\nConverged! Loss {loss.item()} < 5 at step {step}")
         break
 
     if step % 40 == 0:
