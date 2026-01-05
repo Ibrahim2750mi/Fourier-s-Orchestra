@@ -42,13 +42,15 @@ def generate_note_ddsp(keys, note_onsets, note_durations, amplitudes, env_elems,
     :param note_onsets: When each note starts (0 to total_duration) [num_notes]
     :param note_durations: How long each note lasts [num_notes]
     :param amplitudes: Volume of each note [num_notes]
+    :param env_elems: Environment elements [ADSR]
     :param total_duration: Total audio length in seconds
+    :param sample_rate: Sampling rate [Hz]
     :return: Fixed-length audio waveform
     """
 
     num_samples = int(sample_rate * total_duration)
     t = torch.linspace(0, total_duration, num_samples, device=device)
-    audio = torch.zeros(num_samples, device=device)
+    audio_ = torch.zeros(num_samples, device=device)
 
     for i in range(len(keys)):
         # Convert MIDI to frequency
@@ -80,12 +82,12 @@ def generate_note_ddsp(keys, note_onsets, note_durations, amplitudes, env_elems,
 
         note_signal = wave * envelope * note_window
 
-        audio = audio + note_signal
+        audio_ = audio_ + note_signal
 
-    return audio
+    return audio_
 
 
-def piano_envelope_ddsp(t_relative, duration, amplitude, A=0.01, D=0.15, S=0.7, R=0.3):
+def piano_envelope_ddsp(t_relative, duration, amplitude, A, D, S, R):
     """
     ADSR envelope with NaN-safe operations
     """
@@ -100,20 +102,20 @@ def piano_envelope_ddsp(t_relative, duration, amplitude, A=0.01, D=0.15, S=0.7, 
     # Clamp negative times to 0
     t_relative = torch.clamp(t_relative, min=0)
 
-    # Attack - add epsilon to denominator
+    # Attack
     attack = torch.clamp(t_relative / (A + 1e-6), max=1.0)
 
-    # Decay - add epsilon
+    # Decay
     decay_t = torch.clamp((t_relative - A) / (D + 1e-6), min=0, max=1.0)
     decay = 1 - (1 - S) * decay_t
 
-    # Sustain - add epsilon to avoid division by zero
+    # Sustain
     sustain_denom = duration - A - D - R + 1e-6
     sustain_denom = torch.clamp(sustain_denom, min=1e-6)  # Ensure positive
     sustain_t = torch.clamp((t_relative - A - D) / sustain_denom, min=0, max=1.0)
     sustain = S * torch.exp(-1.5 * sustain_t)
 
-    # Release - add epsilon
+    # Release
     release_start = duration - R
     release_t = torch.clamp((t_relative - release_start) / (R + 1e-6), min=0, max=1.0)
     release = S * torch.exp(torch.tensor(-1.5, device=t_relative.device)) * (1 - release_t)
@@ -138,7 +140,7 @@ def piano_envelope_ddsp(t_relative, duration, amplitude, A=0.01, D=0.15, S=0.7, 
 
 
 model = BasicCNN().to(device)
-state = torch.load("model_3.pt", map_location=device)
+state = torch.load("models/model_3.pt", map_location=device)
 model.load_state_dict(state)
 model.eval()
 
@@ -367,6 +369,6 @@ print(f"Best Loss:  {best_loss}")
 audio = audio.detach().cpu()
 audio = audio / (audio.abs().max() + 1e-6)
 audio = audio.unsqueeze(0)
-torchaudio.save(f"output_arousal{final_target_arousal}_valence{final_target_valence}.wav",
+torchaudio.save(f"generated/output_arousal{final_target_arousal}_valence{final_target_valence}.wav",
                 audio, 44100)
 print(f"\nSaved: output_arousal{final_target_arousal}_valence{final_target_valence}.wav")
