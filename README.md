@@ -1,3 +1,13 @@
+# How to Run
+
+```bash
+$ python src/generator.py
+
+```
+
+In line 169 and 170 change the target arousal and valence values
+Note when having negative arousal target reduce arousal epochs to 90-120.
+
 ## Figuring out how to use data
 ###  1. Dynamic annotations v/s static annotations:
 Dreferring dynamic so we have more training data, starting from 15s, with 5second clip size.
@@ -255,10 +265,8 @@ to musical parameters.
 - Stage 2: Introduce valence optimization with ADSR parameters
     
     - ```python
-        optimizer = torch.optim.Adam([note_onsets_, A_shared, D_shared, S_shared, R_shared], lr=0.03)
-        arousal_loss = (10*(pred_emotion[0, 0] - target[0, 0])) ** 2
-        valence_loss = (10*(pred_emotion[0, 1] - target[0, 1])) ** 2
-        loss = valence_loss*2.5 + arousal_loss
+        optimizer = torch.optim.Adam([note_durations_, A_shared, D_shared, S_shared, R_shared], lr=0.03)
+        # refer ablation E for loss function
         ```
         
 - Stage 3: Joint fine tuning with equal weights and adaptive learning rate
@@ -285,7 +293,13 @@ R_shared = torch.tensor([0.3], device=device, requires_grad=True)
 ```
 
 Till now our "model_1.pt" was not giving satisfactory result, so we decided to switch to a new model with batch processing to enhance the results i.e "model_3.pt"
+* * *
+## Ablation E: Loss function stage 3
+**Problem**
+As a note, during the first two stages of optimization, both arousal and valence target value will be reached individually, so the system is capable of reaching the target values, when aimed individually. As stage 1 has loss function only for arousal and stage 2 has loss function only for valence.
+But in stage 3 the loss function is MSE in the valence-arousal space, which distorts the reached value of valence and arousal, hence the quadrant approach is followed.
 
+To address this, a quadrant aware loss is introduced during the final optimization stage. The loss penalizes sign mismatches between predicted and target arousal or valence more heavily than magnitude errors. Specifically, predictions that fall in the incorrect quadrant incur an amplified penalty, while errors that preserve the correct sign are down-weighted once the target direction is achieved
 * * *
 
 # Proposed methodology
