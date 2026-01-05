@@ -4,8 +4,10 @@
 $ python src/generator.py
 
 ```
+The generated audio files will be in generated directory.
 
 In line 169 and 170 change the target arousal and valence values
+
 Note when having negative arousal target reduce arousal epochs to 90-120.
 
 ## Figuring out how to use data
@@ -299,7 +301,25 @@ Till now our "model_1.pt" was not giving satisfactory result, so we decided to s
 As a note, during the first two stages of optimization, both arousal and valence target value will be reached individually, so the system is capable of reaching the target values, when aimed individually. As stage 1 has loss function only for arousal and stage 2 has loss function only for valence.
 But in stage 3 the loss function is MSE in the valence-arousal space, which distorts the reached value of valence and arousal, hence the quadrant approach is followed.
 
-To address this, a quadrant aware loss is introduced during the final optimization stage. The loss penalizes sign mismatches between predicted and target arousal or valence more heavily than magnitude errors. Specifically, predictions that fall in the incorrect quadrant incur an amplified penalty, while errors that preserve the correct sign are down-weighted once the target direction is achieved
+To address this, a quadrant aware loss is introduced during the final optimization stage. The loss penalizes sign mismatches between predicted and target arousal or valence more heavily than magnitude errors. Specifically, predictions that fall in the incorrect quadrant incur an amplified penalty, while errors that preserve the correct sign are down-weighted once the target direction is achieved.
+```python
+    # Check quadrant correctness
+    in_correct_quadrant = ((pred_a * target_a) > 0) and ((pred_v * target_v) > 0)
+
+    arousal_error = 10*(pred_a - target_a)
+    if arousal_error*target_a > 0:
+        arousal_error /= 10
+    valence_error = 10*(pred_v - target_v)
+    if valence_error*target_v > 0:
+        valence_error /= 10
+    # 10x penalty if wrong quadrant
+    if (pred_a * target_a) < 0:
+        arousal_error = arousal_error * 10.0
+    if (pred_v * target_v) < 0:
+        valence_error = valence_error * 10.0
+
+    loss = arousal_error**2 + valence_error**2
+```
 * * *
 
 # Proposed methodology
@@ -490,7 +510,7 @@ In the second stage, ADSR envelope parameters are introduced and valence loss is
 
 - Stage III: Joint Fine Tuning
 
-Finally, all synthesis parameters are jointly optimized using equal weighting for arousal and valence. An adaptive learning-rate scheduler is employed to refine convergence and mitigate local minima.
+Finally, all synthesis parameters are jointly optimized using equal weighting for arousal and valence. An adaptive learning-rate scheduler is employed to refine convergence and mitigate local minima. With a quadrant specific loss function which penalises sign mis matches more heavily than magnitudes.
 
 ### Optimization details
 
@@ -506,6 +526,7 @@ Several design choices were evaluated through ablation.
 - Fixed canvas synthesis without ADSR parameters failed to decouple valence and arousal values.
 - Global temporal pooling resulted in compromised envelope cues.
 - Join optimization was dominated by arousal, which gave motivation for sequential optimization.
+- MSE in stage 3 favoured magnitude, while emotion states correspond with quadrants, hence MSE with quadrant specific penalty was applied.
 
 ## Limitations
 No perceptual listening studies are conducted, and emotion control is assessed only through model predictions. Human evaluation is left for future work.
